@@ -1,0 +1,46 @@
+# Copy to values.local.yaml (gitignored) and fill in. This file holds ALL the
+# credentials; nothing here belongs in git. Every value below is a PLACEHOLDER.
+
+ingress:
+  enabled: true   # flip on once the pod is healthy
+
+# Private GHCR image: the chart builds the pull secret from this PAT (a token
+# with read:packages). Omit for a public/anonymous package.
+imageCredentials:
+  pat: "ghp_xxx_or_github_pat_xxx"
+
+provider:
+  # Base URL of the sms-gateway app running on the phone. It lives on the LAN
+  # at a static DHCP reservation — if the phone's address moves, sends fail here
+  # first. Plain http: the hop never leaves the house.
+  gatewayUrl: "http://10.0.0.50:8080"
+
+secrets:
+  # 1. Basic-auth credentials configured inside the phone's gateway app.
+  gatewayUser: "REPLACE_ME"
+  gatewayPassword: "REPLACE_ME"
+
+  # 2. REQUIRED. Per-service API keys, as a JSON object of service name -> key.
+  #    One key per caller so a leak can be revoked without touching the others,
+  #    and so rate limits are counted per service. Generate each with:
+  #      openssl rand -hex 32
+  apiKeys: '{"talaria":"generate-me","money":"generate-me"}'
+
+  # 3. REQUIRED. HMAC-SHA256 shared secret for the inbound webhook. Generate with:
+  #      openssl rand -hex 32
+  #    This MUST match the secret you configure in the Android gateway app's
+  #    webhook settings — the /api/v1/inbound route is deliberately NOT behind
+  #    Authelia (a phone cannot log in), so this signature is the only thing
+  #    authenticating inbound messages. See templates/ingress-webhook.yaml.
+  webhookSecret: "generate-me"
+
+  # 4. Fan-out targets for inbound messages, as a JSON array. Each subscriber
+  #    gets the message POSTed to `url`, signed with its own `secret` (same
+  #    HMAC-SHA256 scheme), filtered to the `events` it asked for.
+  subscribers: '[{"name":"talaria","url":"http://talaria.talaria.svc.cluster.local:8000/hooks/sms","secret":"generate-me","events":["inbound"]}]'
+
+# Enable the optional NetworkPolicy lockdown once you've confirmed the phone
+# gateway is still reachable (nodeCIDR must cover its LAN address).
+# networkPolicy:
+#   enabled: true
+#   nodeCIDR: 10.0.0.0/8

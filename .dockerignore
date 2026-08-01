@@ -1,0 +1,17 @@
+.git/
+.gitignore
+templates/
+Chart.yaml
+values.yaml
+values.local.yaml
+values.local.yaml.example
+*.md
+*.tgz
+build.sh
+upgrade.sh
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.db

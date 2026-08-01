@@ -1,0 +1,20 @@
+# Secrets — never committed. See values.local.yaml.example.
+values.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local data
+*.db
+*.db-wal
+*.db-shm
+/data/
+
+# Packaged charts
+*.tgz

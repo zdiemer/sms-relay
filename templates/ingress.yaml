@@ -1,0 +1,56 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sms-relay.fullname" . }}
+  labels:
+    {{- include "sms-relay.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: {{ .Values.ingress.tls.certResolver }}
+    # DuckDNS API can only set TXT at the account's top-level subdomain, so
+    # per-host certs for sub-subdomains fail the ACME challenge. We ride a
+    # wildcard SAN instead — one cert covers every sub-subdomain.
+    traefik.ingress.kubernetes.io/router.tls.domains.0.main: {{ .Values.ingress.tls.domain | quote }}
+    traefik.ingress.kubernetes.io/router.tls.domains.0.sans: {{ .Values.ingress.tls.wildcardSan | quote }}
+    {{- if .Values.auth.forwardAuth.enabled }}
+    # Gate the host behind Authelia (see templates/middleware-forwardauth.yaml).
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ include "sms-relay.fullname" . }}-forwardauth@kubernetescrd
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sms-relay.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+    {{- /*
+      Extra hosts over the Cloudflare tunnel — kept empty by default (this can
+      send SMS from my own number; DuckDNS-only). If ever populated, TLS
+      terminates at Cloudflare's edge so these stay out of the ACME cert list.
+    */}}
+    {{- range .Values.ingress.cloudflareHosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sms-relay.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+    {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+  {{- end }}
+{{- end }}

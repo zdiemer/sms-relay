@@ -1,0 +1,9 @@
+apiVersion: v2
+name: sms-relay
+description: Self-hosted SMS relay — a single outbound/inbound SMS API in front of an Android phone gateway, with per-service API keys, retries, and webhook fan-out to subscribers. Gated behind Authelia forward-auth on sms-relay.zachd.duckdns.org, except the HMAC-signed inbound webhook.
+type: application
+version: 0.1.0
+# appVersion tracks the image tag in values.yaml (image.tag).
+appVersion: "v1"
+maintainers:
+  - name: zachd

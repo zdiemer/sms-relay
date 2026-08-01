@@ -1,0 +1,67 @@
+{{- if and .Values.ingress.enabled .Values.ingress.webhook.enabled }}
+{{/*
+The one un-gated route in this chart, and the only place in the selfhosted repo
+that does this — so, at length:
+
+The Android phone acting as the SMS gateway POSTs every inbound message to
+{{ .Values.ingress.webhook.path }}/android-gateway. It is a phone app: it cannot
+complete an Authelia login, has no session cookie, and cannot follow the
+redirect to the portal. Behind forward-auth every inbound SMS is silently a 302
+to a login page, so inbound simply never works.
+
+Traefik attaches middlewares PER ROUTER, and there is no per-path exclusion
+within one router — but each Ingress object becomes its own router. So this is a
+second Ingress on the SAME host with the SAME TLS annotations, differing only in
+carrying NO router.middlewares annotation. Traefik matches the more specific
+path rule first, so requests under {{ .Values.ingress.webhook.path }} land on
+this un-gated router and everything else falls through to the main, Authelia-
+gated one.
+
+Splitting the object is the mechanism; do not "simplify" this back into a second
+path on the main Ingress — that would put the webhook behind Authelia again and
+break inbound with no error anywhere except a 302 in the phone's logs.
+
+Un-gated is not unauthenticated. The app verifies an HMAC-SHA256 signature over
+the request body on this path using SMS_RELAY_WEBHOOK_SECRET (secrets.webhookSecret,
+which is `required` for exactly this reason) and rejects anything that doesn't
+match. The path is differently authenticated, by a shared secret the phone can
+actually compute, rather than by a browser session it cannot.
+
+Consequence to keep in mind: this path is reachable by anyone who can reach the
+host, so the signature check is load-bearing. Rotating webhookSecret means
+updating the Android gateway's webhook settings at the same time.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sms-relay.fullname" . }}-webhook
+  labels:
+    {{- include "sms-relay.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: {{ .Values.ingress.tls.certResolver }}
+    # Same wildcard-SAN pair as the main Ingress: both routers ask for the same
+    # cert, so ACME sees one identical request rather than two competing ones.
+    traefik.ingress.kubernetes.io/router.tls.domains.0.main: {{ .Values.ingress.tls.domain | quote }}
+    traefik.ingress.kubernetes.io/router.tls.domains.0.sans: {{ .Values.ingress.tls.wildcardSan | quote }}
+    # NO router.middlewares here — that omission is the entire point of this file.
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.webhook.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sms-relay.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+  {{- end }}
+{{- end }}

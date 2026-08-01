@@ -1,0 +1,114 @@
+# sms-relay — one SMS API for the whole cluster, backed by an Android phone
+# acting as the gateway. Credentials (gateway login, per-service API keys, the
+# inbound webhook secret, subscriber list) live ONLY in values.local.yaml
+# (gitignored). See README.
+
+image:
+  repository: ghcr.io/zdiemer/sms-relay
+  tag: "v1"
+  pullPolicy: Always
+
+# Private GHCR image: set imageCredentials.pat in values.local.yaml and the
+# chart creates the docker-registry secret + wires it into the pod — a fresh
+# `helm install` is fully self-contained (no imperative kubectl create). Leave
+# pat empty to pull a public package anonymously (the multi-node convention).
+imageCredentials:
+  registry: ghcr.io
+  username: zdiemer
+  pat: ""            # GHCR PAT with read:packages — set in values.local.yaml
+
+# Extra pre-existing pull secrets to reference (in addition to the one the
+# chart builds from imageCredentials above). Usually empty.
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  # Bring the pod up internal-only first (port-forward), then flip this on.
+  enabled: false
+  className: traefik
+  host: sms-relay.zachd.duckdns.org
+  # Deliberately empty: this can send SMS on my own phone number and carries
+  # message bodies, so it is NOT published on the public diemer.codes
+  # Cloudflare tunnel — DuckDNS + Authelia (LAN / Tailscale) only.
+  cloudflareHosts: []
+  # The inbound webhook needs its own Ingress to escape forward-auth; see
+  # templates/ingress-webhook.yaml for why. Off only if the gateway is
+  # delivering some other way.
+  webhook:
+    enabled: true
+    path: /api/v1/inbound
+  tls:
+    enabled: true
+    certResolver: duckdns
+    domain: zachd.duckdns.org
+    wildcardSan: "*.zachd.duckdns.org"
+
+auth:
+  # Gate the host behind Authelia forward-auth (same pattern as docs/stirling-pdf
+  # and finance/money). Note this covers the UI and the human-facing API only —
+  # service-to-service callers authenticate with an API key from secrets.apiKeys,
+  # and the inbound webhook with an HMAC signature.
+  forwardAuth:
+    enabled: true
+    autheliaService: authelia
+    autheliaNamespace: auth
+    autheliaPort: 9091
+    autheliaPath: /api/authz/forward-auth
+
+persistence:
+  # SQLite (outbox, delivery attempts, inbound messages, per-key rate counters).
+  data:
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: ""   # "" => cluster default
+
+# Which backend actually puts the message on the air. "android_gateway" talks
+# HTTP to an sms-gateway app on a phone on the LAN; swapping this is how a real
+# carrier API would be dropped in later.
+provider:
+  kind: android_gateway
+  gatewayUrl: ""       # e.g. http://10.0.0.50:8080 — set in values.local.yaml
+
+# E.164 region assumed for bare 10-digit numbers.
+defaultRegion: US
+
+rateLimit:
+  # Per API key. A phone gateway is slow and carriers flag bursts, so this is
+  # deliberately low — it is a fairness limit, not a capacity limit.
+  perMinute: 30
+
+retry:
+  # A phone drops off wifi constantly; give sends a generous number of tries
+  # before they go to the dead-letter state.
+  maxAttempts: 5
+
+networkPolicy:
+  enabled: false
+  nodeCIDR: 10.0.0.0/8
+
+# --- secrets: OVERRIDE IN values.local.yaml ONLY --------------------------
+secrets:
+  # Basic-auth credentials the relay uses to call the phone's gateway app.
+  gatewayUser: ""
+  gatewayPassword: ""
+  # REQUIRED. JSON object mapping service name -> API key, e.g.
+  #   {"talaria":"...","money":"..."}
+  apiKeys: ""
+  # REQUIRED. HMAC-SHA256 shared secret for the inbound webhook — this is the
+  # only thing standing in front of the un-gated /api/v1/inbound route.
+  webhookSecret: ""
+  # JSON array of {"name","url","secret","events"} fan-out targets for inbound.
+  subscribers: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    # Almost all of the work is waiting on the phone's HTTP API; this is a
+    # bookkeeping service, not a compute one.
+    cpu: "1"
+    memory: 512Mi

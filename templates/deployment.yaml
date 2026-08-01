@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sms-relay.fullname" . }}
+  labels:
+    {{- include "sms-relay.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # SQLite on a RWO PVC — never run two writers. Two replicas would also mean
+  # two retry loops racing to re-send the same queued message.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sms-relay.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sms-relay.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll the pod when the creds/keys Secret changes.
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- $ips := .Values.imagePullSecrets | default list }}
+      {{- if .Values.imageCredentials.pat }}
+      {{- $ips = append $ips (dict "name" (printf "%s-ghcr" (include "sms-relay.fullname" .))) }}
+      {{- end }}
+      {{- with $ips }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: sms-relay
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          env:
+            - name: HOME
+              value: /tmp
+            - name: SMS_RELAY_DB_PATH
+              value: /data/sms-relay.db
+            - name: SMS_RELAY_PROVIDER
+              value: {{ .Values.provider.kind | quote }}
+            - name: SMS_RELAY_GATEWAY_URL
+              value: {{ .Values.provider.gatewayUrl | quote }}
+            - name: SMS_RELAY_DEFAULT_REGION
+              value: {{ .Values.defaultRegion | quote }}
+            - name: SMS_RELAY_RATE_LIMIT_PER_MINUTE
+              value: {{ .Values.rateLimit.perMinute | quote }}
+            - name: SMS_RELAY_MAX_ATTEMPTS
+              value: {{ .Values.retry.maxAttempts | quote }}
+            {{- if .Values.ingress.enabled }}
+            # Absolute base for links the app puts *into* outbound messages —
+            # it only knows its external name from the ingress, never from the
+            # request (which arrives as the in-cluster Service name).
+            - name: SMS_RELAY_PUBLIC_URL
+              value: https://{{ .Values.ingress.host }}
+            {{- end }}
+            {{- range $k := list "SMS_RELAY_GATEWAY_USER" "SMS_RELAY_GATEWAY_PASSWORD" "SMS_RELAY_API_KEYS" "SMS_RELAY_WEBHOOK_SECRET" "SMS_RELAY_SUBSCRIBERS" }}
+            - name: {{ $k }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-relay.fullname" $ }}
+                  key: {{ $k }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "sms-relay.fullname" . }}-data
+        # readOnlyRootFilesystem is on, so anything that wants a scratch file
+        # (including HOME above) needs this.
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sms-relay</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd; --fg: #16181d; --muted: #6b7280;
+    --card: #fff; --line: #e5e7eb; --accent: #2563eb;
+    --ok: #059669; --warn: #b45309; --err: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1015; --fg: #e6e8ee; --muted: #9aa1ad;
+      --card: #171a21; --line: #262b35; --accent: #60a5fa;
+      --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--line);
+    display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+  }
+  h1 { font-size: 1.05rem; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  .grow { flex: 1; }
+  input, select, button {
+    font: inherit; padding: 0.4rem 0.6rem; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--card); color: var(--fg);
+  }
+  button { cursor: pointer; border-color: var(--accent); color: var(--accent); }
+  button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+  .stats { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 0.7rem 1rem; min-width: 7rem;
+  }
+  .stat b { display: block; font-size: 1.35rem; font-weight: 650; }
+  .stat span { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); }
+  th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.body { max-width: 32rem; overflow-wrap: anywhere; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .pill {
+    display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+    font-size: 0.76rem; font-weight: 600; border: 1px solid currentColor;
+  }
+  .s-delivered, .s-sent, .s-received { color: var(--ok); }
+  .s-queued, .s-sending { color: var(--warn); }
+  .s-failed { color: var(--err); }
+  .muted { color: var(--muted); }
+  .empty { padding: 2.5rem; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>sms-relay</h1>
+  <span class="muted" id="health">…</span>
+  <span class="grow"></span>
+  <input id="key" type="password" placeholder="API key" size="24">
+  <select id="filter">
+    <option value="">all</option>
+    <option value="outbound">outbound</option>
+    <option value="inbound">inbound</option>
+  </select>
+  <button id="refresh">Refresh</button>
+</header>
+<main>
+  <div class="stats" id="stats"></div>
+  <div class="scroll"><table>
+    <thead><tr>
+      <th>When</th><th>Dir</th><th>Status</th><th>Service</th>
+      <th>Number</th><th>Body</th><th>Attempts</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <p class="empty" id="empty" hidden>No messages yet.</p>
+</main>
+<script>
+// The page sits behind Authelia, but the API itself wants a service key, so
+// the key is entered here and kept in localStorage rather than baked in.
+const $ = (id) => document.getElementById(id);
+const KEY_STORE = "sms-relay-key";
+$("key").value = localStorage.getItem(KEY_STORE) || "";
+$("key").addEventListener("change", (e) => localStorage.setItem(KEY_STORE, e.target.value));
+
+const fmt = (iso) => new Date(iso).toLocaleString(undefined,
+  { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+async function load() {
+  const key = $("key").value.trim();
+  const dir = $("filter").value;
+
+  try {
+    const h = await (await fetch("/api/health")).json();
+    $("health").textContent = `${h.status} · ${h.provider} · ${h.queued} queued`;
+  } catch { $("health").textContent = "unreachable"; }
+
+  if (!key) { $("empty").hidden = false; $("empty").textContent = "Enter an API key to view the log."; return; }
+
+  const url = "/api/v1/messages?limit=200" + (dir ? `&direction=${dir}` : "");
+  const res = await fetch(url, { headers: { "X-API-Key": key } });
+  if (!res.ok) {
+    $("rows").innerHTML = "";
+    $("empty").hidden = false;
+    $("empty").textContent = res.status === 401 ? "Invalid API key." : `Error ${res.status}`;
+    return;
+  }
+  const data = await res.json();
+  render(data.messages, data.total);
+}
+
+function render(messages, total) {
+  const counts = {};
+  for (const m of messages) counts[m.status] = (counts[m.status] || 0) + 1;
+  $("stats").innerHTML =
+    `<div class="stat"><b>${total}</b><span>total</span></div>` +
+    Object.entries(counts).map(([s, n]) =>
+      `<div class="stat"><b>${n}</b><span>${s}</span></div>`).join("");
+
+  $("empty").hidden = messages.length > 0;
+  $("empty").textContent = "No messages yet.";
+  $("rows").innerHTML = messages.map((m) => `
+    <tr>
+      <td class="muted">${fmt(m.created_at)}</td>
+      <td>${m.direction}</td>
+      <td><span class="pill s-${m.status}">${m.status}</span></td>
+      <td>${esc(m.service)}</td>
+      <td><code>${esc(m.direction === "inbound" ? (m.from || "?") : (m.to || "?"))}</code></td>
+      <td class="body">${esc(m.body)}${m.error ? `<br><span class="s-failed">${esc(m.error)}</span>` : ""}</td>
+      <td>${m.attempts}</td>
+    </tr>`).join("");
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+$("refresh").addEventListener("click", load);
+$("filter").addEventListener("change", load);
+$("key").addEventListener("change", load);
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

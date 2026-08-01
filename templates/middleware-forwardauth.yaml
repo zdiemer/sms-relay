@@ -1,0 +1,30 @@
+{{- if and .Values.ingress.enabled .Values.auth.forwardAuth.enabled }}
+{{/*
+Traefik Middleware that bounces every request through Authelia before it
+reaches the relay. Rendered into THIS chart's namespace (rather than reusing
+the one the Authelia chart ships in `auth`) so the Ingress can reference it
+without Traefik's allowCrossNamespace — the cross-namespace hop is just the
+plain HTTP `address` URL below, which is always allowed.
+
+Only the main Ingress attaches this; the inbound-webhook Ingress deliberately
+does not (see ingress-webhook.yaml).
+
+Authelia 4.38+ uses /api/authz/forward-auth. apiVersion is traefik.io/v1alpha1
+(Traefik v3, ships with current k3s).
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "sms-relay.fullname" . }}-forwardauth
+  labels:
+    {{- include "sms-relay.labels" . | nindent 4 }}
+spec:
+  forwardAuth:
+    address: http://{{ .Values.auth.forwardAuth.autheliaService }}.{{ .Values.auth.forwardAuth.autheliaNamespace }}.svc.cluster.local:{{ .Values.auth.forwardAuth.autheliaPort }}{{ .Values.auth.forwardAuth.autheliaPath }}
+    trustForwardHeader: true
+    authResponseHeaders:
+      - Remote-User
+      - Remote-Groups
+      - Remote-Name
+      - Remote-Email
+{{- end }}

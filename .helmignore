@@ -1,0 +1,15 @@
+# The chart lives at the repo root alongside the app source; keep everything
+# that isn't chart metadata / templates out of the packaged chart.
+app/
+Dockerfile
+build.sh
+upgrade.sh
+*.md
+.git/
+.gitignore
+.dockerignore
+.venv/
+__pycache__/
+*.pyc
+*.tgz
+values.local.yaml
