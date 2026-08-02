@@ -1,8 +1,9 @@
 """SMS Gateway for Android (capcom6) transport.
 
-The phone runs an HTTP server on :8080 with basic auth. This is the same call
-Talaria made directly from `core/sms/sender.py`; the difference is that a
-failure here now lands in a retry queue instead of a log line.
+The phone runs an HTTP server on :8080 with basic auth. The call itself is a
+single POST — the value this wrapper adds is that a failure lands in a retry
+queue instead of a log line, and that it distinguishes "never going to work"
+from "try again in a minute".
 """
 
 from __future__ import annotations

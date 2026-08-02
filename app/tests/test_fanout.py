@@ -11,7 +11,6 @@ import hashlib
 import hmac
 import json
 import os
-import tempfile
 import threading
 import time
 import uuid
@@ -19,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-TMPDIR = tempfile.mkdtemp(prefix="sms-relay-fanout-")
+from .conftest import WEBHOOK_SECRET
 
 RECEIVED: list[dict] = []
 FAIL_TIMES = {"count": 0}
@@ -58,35 +57,22 @@ def subscriber_server():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    os.environ.update(
-        SMS_RELAY_DB_PATH=os.path.join(TMPDIR, "test.db"),
-        SMS_RELAY_PROVIDER="dev",
-        SMS_RELAY_DEV_OUTPUT_DIR=os.path.join(TMPDIR, "out"),
-        SMS_RELAY_API_KEYS=json.dumps({"talaria": "key-talaria"}),
-        SMS_RELAY_WEBHOOK_SECRET="inbound-secret",
-        SMS_RELAY_SUBSCRIBERS=json.dumps(
-            [
-                {
-                    "name": "talaria",
-                    "url": f"http://127.0.0.1:{port}/hook",
-                    "secret": "subscriber-secret",
-                },
-                {"name": "flaky", "url": f"http://127.0.0.1:{port}/flaky", "secret": ""},
-            ]
-        ),
+    # Only the subscriber list needs setting here — it is read live on every
+    # fan-out, and the port isn't known until the server binds. Everything else
+    # comes from conftest so the two test modules share one env and one DB.
+    os.environ["SMS_RELAY_SUBSCRIBERS"] = json.dumps(
+        [
+            {
+                "name": "talaria",
+                "url": f"http://127.0.0.1:{port}/hook",
+                "secret": "subscriber-secret",
+            },
+            {"name": "flaky", "url": f"http://127.0.0.1:{port}/flaky", "secret": ""},
+        ]
     )
     yield port
+    os.environ["SMS_RELAY_SUBSCRIBERS"] = "[]"
     server.shutdown()
-
-
-@pytest.fixture(scope="module")
-def client(subscriber_server):
-    from fastapi.testclient import TestClient
-
-    from sms_relay.main import app
-
-    with TestClient(app) as c:
-        yield c
 
 
 def _post_inbound(client, body_text):
@@ -103,7 +89,7 @@ def _post_inbound(client, body_text):
         content=raw,
         headers={
             "Content-Type": "application/json",
-            "X-Signature": sign(raw, "inbound-secret"),
+            "X-Signature": sign(raw, WEBHOOK_SECRET),
         },
     )
 

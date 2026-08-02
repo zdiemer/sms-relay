@@ -1,8 +1,7 @@
 """Filesystem provider for local development.
 
-Mirrors Talaria's old DevSmsSender: writes each message to a file instead of
-touching a real handset, so you can run the whole queue/retry/fan-out path
-without a phone.
+Writes each message to a file instead of touching a real handset, so the whole
+queue/retry/fan-out path can be exercised without a phone.
 """
 
 from __future__ import annotations

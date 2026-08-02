@@ -10,23 +10,27 @@ Runs at `sms-relay.zachd.duckdns.org` in the `infra` namespace.
 
 ## Why this exists
 
-Talaria talked to the phone directly: one `httpx.post` with a 5-second timeout,
-and on failure a log line. A phone that was asleep, off wifi, or had moved IP
-silently dropped the message — alerts and signup confirmation codes included.
-There was no record that a message had ever been sent.
+A handset running an HTTP gateway is a fine SMS transport and a poor SMS API.
+It is asleep, off wifi, or between IP addresses more often than you'd like, and
+when it is, a naive `POST` just fails. Services that call it directly end up
+either dropping messages or each growing their own half of a retry queue.
 
-This service is that call plus everything that was missing:
+This puts one durable layer in front of it:
 
-| | Before (in Talaria) | Now |
-|---|---|---|
-| Failure handling | logged, dropped | retried with exponential backoff, capped at 5 attempts |
-| Record of sends | none | every message persisted with status and error |
-| Delivery status | unknown | `sent` → `delivered` via gateway receipts |
-| Duplicate sends | possible on retry | idempotency keys |
-| Burst behaviour | whole batch at once | rate-limited (default 30/min) |
-| Inbound SMS | not received at all | stored and fanned out to subscribers |
-| Phone format | three copies of `^\d{10}$` | E.164 via libphonenumber |
-| Credentials | in every consumer | only here |
+- **Sends survive the handset.** Messages are persisted on arrival and retried
+  with exponential backoff (5 attempts by default). A phone that is unreachable
+  delays delivery; it doesn't lose it.
+- **Every message is on the record**, with status, attempt count and last error.
+- **Delivery status** is tracked through to `delivered` using gateway receipts.
+- **Idempotency keys** make a caller's own retry safe — replaying a send returns
+  the original message instead of texting twice.
+- **Rate limiting** (default 30/min) keeps a burst from being silently dropped
+  by the handset.
+- **Inbound SMS** is received, stored, and fanned out to subscriber services
+  over signed webhooks.
+- **E.164 normalization** via libphonenumber, so callers can pass whatever
+  format they have.
+- **Credentials live here only.** Consumers hold an API key, not your phone.
 
 ## API
 

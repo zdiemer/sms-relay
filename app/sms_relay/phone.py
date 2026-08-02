@@ -1,9 +1,9 @@
 """Phone number normalization.
 
-Every number crossing the API boundary is stored in E.164. Talaria historically
-carried bare 10-digit US strings validated by three separate copies of
-`^\\d{10}$`; normalizing centrally here is most of the reason to have a shared
-service at all.
+Every number crossing the API boundary is stored in E.164. Callers tend to
+carry whatever their signup form accepted — bare 10-digit strings, dashes,
+parens — each with its own ad-hoc regex. Normalizing centrally here is most of
+the reason to have a shared service at all.
 """
 
 from __future__ import annotations
@@ -41,8 +41,8 @@ def normalize(raw: str, region: str | None = None) -> str:
 def redact(number: str | None) -> str:
     """Mask all but the last 4 digits, for logs.
 
-    Talaria logs full numbers at INFO today. This service holds every message
-    for every consumer, so its logs are a far juicier target — don't repeat it.
+    This service holds every message for every consumer, which makes its logs a
+    far juicier target than any single caller's. Never log a full number.
     """
     if not number:
         return "<none>"

@@ -9,43 +9,20 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import tempfile
 import uuid
 
 import pytest
 
-TMPDIR = tempfile.mkdtemp(prefix="sms-relay-test-")
+from sms_relay.auth import sign
+from sms_relay.models import MessageStatus
+from sms_relay.phone import InvalidPhoneNumber, normalize, redact
+from sms_relay.providers.base import ProviderError
+from sms_relay.worker import RateLimiter, backoff_seconds
 
-# Config is read at import time, so the environment has to be set before any
-# sms_relay module is imported.
-os.environ.update(
-    SMS_RELAY_DB_PATH=os.path.join(TMPDIR, "test.db"),
-    SMS_RELAY_PROVIDER="dev",
-    SMS_RELAY_DEV_OUTPUT_DIR=os.path.join(TMPDIR, "out"),
-    SMS_RELAY_API_KEYS=json.dumps({"talaria": "key-talaria", "money": "key-money"}),
-    SMS_RELAY_WEBHOOK_SECRET="test-webhook-secret",
-    SMS_RELAY_RATE_LIMIT_PER_MINUTE="600",
-    SMS_RELAY_MAX_ATTEMPTS="3",
-    SMS_RELAY_DEFAULT_REGION="US",
-)
+from .conftest import API_KEYS, OUTPUT_DIR
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from sms_relay.auth import sign  # noqa: E402
-from sms_relay.main import app  # noqa: E402
-from sms_relay.models import MessageStatus  # noqa: E402
-from sms_relay.phone import InvalidPhoneNumber, normalize, redact  # noqa: E402
-from sms_relay.providers.base import ProviderError  # noqa: E402
-from sms_relay.worker import RateLimiter, backoff_seconds  # noqa: E402
-
-TALARIA = {"X-API-Key": "key-talaria"}
-MONEY = {"X-API-Key": "key-money"}
-
-
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as c:
-        yield c
+TALARIA = {"X-API-Key": API_KEYS["talaria"]}
+MONEY = {"X-API-Key": API_KEYS["money"]}
 
 
 def wait_for(client, message_id, headers, statuses, timeout=15.0):
@@ -68,7 +45,7 @@ def wait_for(client, message_id, headers, statuses, timeout=15.0):
     "raw",
     ["2025550101", "(202) 555-0101", "202-555-0101", "+12025550101", "1 202 555 0101"],
 )
-def test_normalize_accepts_the_formats_talaria_used(raw):
+def test_normalize_accepts_the_formats_callers_actually_send(raw):
     assert normalize(raw) == "+12025550101"
 
 
@@ -127,7 +104,7 @@ def test_send_queues_and_worker_delivers(client):
     assert sent["provider_message_id"]
     assert sent["error"] is None
 
-    written = os.listdir(os.path.join(TMPDIR, "out"))
+    written = os.listdir(OUTPUT_DIR)
     assert any("5550102" in f for f in written)
 
 
