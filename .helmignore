@@ -13,3 +13,6 @@ __pycache__/
 *.pyc
 *.tgz
 values.local.yaml
+
+# 1Password reference templates — never part of the packaged chart.
+values.local.tpl.yaml
