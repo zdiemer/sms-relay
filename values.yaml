@@ -63,7 +63,7 @@ persistence:
   data:
     size: 1Gi
     accessMode: ReadWriteOnce
-    storageClass: ""   # "" => cluster default
+    storageClass: truenas-iscsi   # NAS-backed block; SQLite needs real fsync
 
 # Which backend actually puts the message on the air. "android_gateway" talks
 # HTTP to an sms-gateway app on a phone on the LAN; swapping this is how a real
