@@ -1,0 +1,14 @@
+# The image is built and pushed from a laptop via build.sh; CI only proves a
+# PR (usually a Renovate bump) still builds: base tag exists, uv.lock
+# resolves, the app installs.
+name: build
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build .
