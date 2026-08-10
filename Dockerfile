@@ -4,8 +4,14 @@
 FROM python:3.12-slim AS runtime
 WORKDIR /app
 
+# Install from uv.lock so every image build resolves the same dependency set
+# instead of whatever PyPI serves that day.
+COPY --from=ghcr.io/astral-sh/uv:0.12.3 /uv /usr/local/bin/uv
 COPY app/ /app/app/
-RUN pip install --no-cache-dir /app/app
+RUN uv export --directory /app/app --frozen --no-dev --no-emit-project -o /tmp/requirements.txt \
+ && uv pip install --system --no-cache -r /tmp/requirements.txt \
+ && uv pip install --system --no-cache --no-deps /app/app \
+ && rm /tmp/requirements.txt
 
 ENV SMS_RELAY_DB_PATH=/data/sms-relay.db \
     HOME=/tmp \
