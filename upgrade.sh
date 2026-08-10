@@ -56,8 +56,13 @@ PY
   if [[ -z "$TOKEN" ]]; then
     echo "    skipped (no GHCR credentials — cannot verify)" >&2
   else
+    # Accept BOTH single manifests and manifest lists/indexes. A registry
+    # answers 404 — not 406 — when the tag exists but no Accept type matches,
+    # so a missing index type reads as "image was never pushed" and blocks a
+    # perfectly good deploy. Docker produces an OCI *index* by default now,
+    # which means the next rebuild of this image would trip it.
     CODE="$(curl -sL -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" \
-            -H 'Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \
+            -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \
             "https://ghcr.io/v2/${IMG_PATH}/manifests/${TAG}" || echo 000)"
     if [[ "$CODE" != "200" ]]; then
       echo "ERROR: ${REPO}:${TAG} is not in the registry (HTTP ${CODE})." >&2
