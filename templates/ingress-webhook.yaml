@@ -40,11 +40,6 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.tls.certresolver: {{ .Values.ingress.tls.certResolver }}
-    # Same wildcard-SAN pair as the main Ingress: both routers ask for the same
-    # cert, so ACME sees one identical request rather than two competing ones.
-    traefik.ingress.kubernetes.io/router.tls.domains.0.main: {{ .Values.ingress.tls.domain | quote }}
-    traefik.ingress.kubernetes.io/router.tls.domains.0.sans: {{ .Values.ingress.tls.wildcardSan | quote }}
     # NO router.middlewares here — that omission is the entire point of this file.
 spec:
   ingressClassName: {{ .Values.ingress.className }}

@@ -8,12 +8,6 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.tls.certresolver: {{ .Values.ingress.tls.certResolver }}
-    # DuckDNS API can only set TXT at the account's top-level subdomain, so
-    # per-host certs for sub-subdomains fail the ACME challenge. We ride a
-    # wildcard SAN instead — one cert covers every sub-subdomain.
-    traefik.ingress.kubernetes.io/router.tls.domains.0.main: {{ .Values.ingress.tls.domain | quote }}
-    traefik.ingress.kubernetes.io/router.tls.domains.0.sans: {{ .Values.ingress.tls.wildcardSan | quote }}
     {{- if .Values.auth.forwardAuth.enabled }}
     # Gate the host behind Authelia (see templates/middleware-forwardauth.yaml).
     traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ include "sms-relay.fullname" . }}-forwardauth@kubernetescrd

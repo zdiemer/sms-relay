@@ -42,9 +42,6 @@ ingress:
     path: /api/v1/inbound
   tls:
     enabled: true
-    certResolver: duckdns
-    domain: zachd.duckdns.org
-    wildcardSan: "*.zachd.duckdns.org"
 
 auth:
   # Gate the host behind Authelia forward-auth (same pattern as docs/stirling-pdf
