@@ -2,22 +2,22 @@
 name = "sms-relay"
 version = "0.1.0"
 description = "Self-hosted SMS gateway — a durable send/receive API in front of an Android SMS gateway."
-requires-python = ">=3.11"
+requires-python = "==3.14.7"
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
-    "sqlalchemy>=2.0",
-    "aiosqlite>=0.20",
-    "httpx>=0.27",
-    "pydantic>=2.9",
-    "phonenumbers>=8.13",
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.1",
+    "sqlalchemy==2.0.51",
+    "aiosqlite==0.22.1",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+    "phonenumbers==9.0.36",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.7"]
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "ruff==0.16.2"]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
