@@ -2,5 +2,14 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>zdiemer/selfhosted//renovate/default"
+  ],
+  "packageRules": [
+    {
+      "description": "uv.lock is enforced at image build; pinning pyproject floors is churn \u2014 and the pin PR broke the build (source-built httptools, no gcc in slim)",
+      "matchManagers": [
+        "pep621"
+      ],
+      "rangeStrategy": "preserve"
+    }
   ]
 }
