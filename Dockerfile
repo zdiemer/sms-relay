@@ -1,7 +1,7 @@
 # sms-relay — self-hosted SMS gateway. Single stage: the UI is one static HTML
 # file served by FastAPI, so there is no frontend build to do.
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 WORKDIR /app
 
 # Install from uv.lock so every image build resolves the same dependency set
