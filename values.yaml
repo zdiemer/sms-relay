@@ -4,11 +4,13 @@
 # (gitignored). See README.
 
 image:
-  repository: ghcr.io/zdiemer/sms-relay
+  repository: registry.zachd.duckdns.org/zdiemer/sms-relay
   tag: "v1"
   pullPolicy: Always
 
-# Private GHCR image: set imageCredentials.pat in values.local.yaml and the
+# Only for an image still on GHCR. The in-cluster registry needs no pull secret:
+# every node's containerd carries the credential (infra/registry). Set
+# imageCredentials.pat in values.local.yaml only for a private GHCR image, and the
 # chart creates the docker-registry secret + wires it into the pod — a fresh
 # `helm install` is fully self-contained (no imperative kubectl create). Leave
 # pat empty to pull a public package anonymously (the multi-node convention).

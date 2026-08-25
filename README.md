@@ -96,7 +96,7 @@ Same shape as everything else in the selfhosted repo:
 ```bash
 cp values.local.yaml.example values.local.yaml   # fill in, gitignored
 kubectl create namespace infra                   # if it doesn't exist
-./build.sh                                       # → ghcr.io/zdiemer/sms-relay:vN
+./build.sh                                       # → registry.zachd.duckdns.org/zdiemer/sms-relay:vN
 ./upgrade.sh
 ```
 

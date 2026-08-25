@@ -49,7 +49,36 @@ command -v kubectl >/dev/null || { echo "kubectl required"; exit 1; }
 # simply lost. Checking first turns that outage into an error.
 REPO="$(awk '/^  repository:/{gsub(/["'"'"']/,"",$2); print $2; exit}' "$VALUES")"
 TAG="$(awk '/^  tag:/{gsub(/["'"'"']/,"",$2); print $2; exit}' "$VALUES")"
-if [[ "$REPO" == ghcr.io/* && -n "$TAG" ]] && command -v curl >/dev/null && command -v python3 >/dev/null; then
+if [[ "$REPO" == registry.zachd.duckdns.org/* && -n "$TAG" ]] && command -v curl >/dev/null && command -v python3 >/dev/null; then
+  echo "==> Verifying ${REPO}:${TAG} exists"
+  REG_HOST="${REPO%%/*}"
+  IMG_PATH="${REPO#*/}"
+  # The in-cluster registry (selfhosted/infra/registry): plain basic auth on
+  # every request, with the credential build.sh already has in the docker
+  # config. No token dance.
+  BASIC="$(python3 - "$HOME/.docker/config.json" "$REG_HOST" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        print(json.load(fh).get("auths", {}).get(sys.argv[2], {}).get("auth", ""))
+except Exception:
+    print("")
+PY
+)"
+  if [[ -z "$BASIC" ]]; then
+    echo "    skipped (no credential for ${REG_HOST} in ~/.docker/config.json — cannot verify)" >&2
+  else
+    CODE="$(curl -sL -o /dev/null -w '%{http_code}' -H "Authorization: Basic ${BASIC}" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \
+            "https://${REG_HOST}/v2/${IMG_PATH}/manifests/${TAG}" || echo 000)"
+    if [[ "$CODE" != "200" ]]; then
+      echo "ERROR: ${REPO}:${TAG} is not in the registry (HTTP ${CODE})." >&2
+      echo "       Run build.sh first — deploying now would tear the pod down with nothing to replace it." >&2
+      exit 1
+    fi
+    echo "    ok"
+  fi
+elif [[ "$REPO" == ghcr.io/* && -n "$TAG" ]] && command -v curl >/dev/null && command -v python3 >/dev/null; then
   echo "==> Verifying ${REPO}:${TAG} exists"
   IMG_PATH="${REPO#ghcr.io/}"
   # If the package is private, an anonymous pull token is refused; reuse the
