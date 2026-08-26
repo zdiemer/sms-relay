@@ -1,3 +1,17 @@
+<div align="center">
+
+<img src="docs/banner.png" alt="sms-relay" width="100%">
+
+[![build](https://img.shields.io/github/actions/workflow/status/zdiemer/sms-relay/build.yml?style=flat-square&label=build)](https://github.com/zdiemer/sms-relay/actions/workflows/build.yml)
+![License](https://img.shields.io/github/license/zdiemer/sms-relay?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-durable_queue-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![k3s](https://img.shields.io/badge/k3s-self--hosted-FFC61C?style=flat-square&logo=k3s&logoColor=black)
+
+</div>
+
 # sms-relay
 
 A self-hosted SMS gateway for the cluster — the thing every other service calls
@@ -7,6 +21,24 @@ messages through an Android handset running
 with the durability layer a bare handset doesn't have.
 
 Runs at `sms-relay.zachd.duckdns.org` in the `infra` namespace.
+
+## Screenshots
+
+Invented traffic on a demo instance
+([`docs/capture/serve_demo.py`](docs/capture/serve_demo.py)) running the
+built-in `dev` provider, which writes to a directory instead of a handset. No
+real number, message body or gateway credential is involved.
+
+<table>
+<tr>
+<td width="58%"><img src="docs/shots/log.png" alt="The message log viewer"><br>
+<sub><b>Log</b> — every message, its status and how many attempts it took. A
+caller sees its own outbound plus every inbound, which is the scoping the API
+enforces.</sub></td>
+<td width="42%"><img src="docs/shots/api.png" alt="The OpenAPI docs"><br>
+<sub><b>API</b> — send, fetch, list, and the handset's inbound webhook.</sub></td>
+</tr>
+</table>
 
 ## Why this exists
 
