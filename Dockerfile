@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install from uv.lock so every image build resolves the same dependency set
 # instead of whatever PyPI serves that day.
-COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /usr/local/bin/uv
 COPY app/ /app/app/
 RUN uv export --directory /app/app --frozen --no-dev --no-emit-project -o /tmp/requirements.txt \
  && uv pip install --system --no-cache -r /tmp/requirements.txt \
