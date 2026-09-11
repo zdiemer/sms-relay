@@ -5,6 +5,10 @@ Dockerfile
 build.sh
 upgrade.sh
 *.md
+# README banner + the seeded-demo screenshots: ~900K of PNG, which neither
+# gzips nor base64s down, and helm stores the whole packaged chart in the
+# release Secret. Without this the upgrade dies on the 1 MiB Secret limit.
+docs/
 .git/
 .gitignore
 .dockerignore
