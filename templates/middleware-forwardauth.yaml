@@ -20,6 +20,7 @@ metadata:
     {{- include "sms-relay.labels" . | nindent 4 }}
 spec:
   forwardAuth:
+    maxResponseBodySize: 1048576 # Bound Authelia responses; silence Traefik warning spam.
     address: http://{{ .Values.auth.forwardAuth.autheliaService }}.{{ .Values.auth.forwardAuth.autheliaNamespace }}.svc.cluster.local:{{ .Values.auth.forwardAuth.autheliaPort }}{{ .Values.auth.forwardAuth.autheliaPath }}
     trustForwardHeader: true
     authResponseHeaders:
