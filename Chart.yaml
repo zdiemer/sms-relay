@@ -4,6 +4,6 @@ description: Self-hosted SMS relay — a single outbound/inbound SMS API in fron
 type: application
 version: 0.1.0
 # appVersion tracks the image tag in values.yaml (image.tag).
-appVersion: "renovate-20261019"
+appVersion: "gateway-monitoring-20261019"
 maintainers:
   - name: zachd

@@ -66,7 +66,7 @@ This puts one durable layer in front of it:
 
 ## API
 
-All endpoints except `/api/health` and the inbound webhook need an API key,
+All endpoints except `/api/health`, `/api/health/gateway`, and the inbound webhook need an API key,
 either `Authorization: Bearer <key>` or `X-API-Key: <key>`. Keys map to a
 service name, and that name is recorded on every message.
 
@@ -118,6 +118,14 @@ the others. If a subscriber has a `secret`, its payload is signed the same way
 (the kubelet has no API key) and deliberately *not* a probe of the handset: the
 phone being briefly unreachable is what the queue is for, and failing readiness
 would restart the pod that owns the queue.
+
+`GET /api/health/gateway` — monitoring-only handset connectivity check. Makes a
+bounded authenticated GET to the Android gateway's `/` endpoint (some versions
+return 500 on `/health`). Returns 200 when it answers 200, otherwise 503. Exposes
+only `status`, never phone credentials or upstream responses; does not send SMS.
+The cluster status page and Alloy use this endpoint. Kubernetes probes continue
+using `/api/health`, so a phone outage does not restart or remove the relay.
+Connectivity is not proof of carrier delivery; validate receipt separately.
 
 A read-only log viewer is served at `/`, behind Authelia.
 
