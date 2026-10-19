@@ -24,6 +24,7 @@ API_KEYS = {"talaria": "key-talaria", "money": "key-money"}
 WEBHOOK_SECRET = "test-webhook-secret"
 
 os.environ.update(
+    SMS_RELAY_METRICS_PORT="0",
     SMS_RELAY_DB_PATH=os.path.join(TMPDIR, "test.db"),
     SMS_RELAY_PROVIDER="dev",
     SMS_RELAY_DEV_OUTPUT_DIR=OUTPUT_DIR,

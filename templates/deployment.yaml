@@ -18,6 +18,7 @@ spec:
       labels:
         {{- include "sms-relay.selectorLabels" . | nindent 8 }}
       annotations:
+        monitoring.zachd/health-port: "9105"
         # Roll the pod when the creds/keys Secret changes.
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
@@ -39,6 +40,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            - name: metrics
+              containerPort: 9105
             - name: http
               containerPort: {{ .Values.service.port }}
           env:

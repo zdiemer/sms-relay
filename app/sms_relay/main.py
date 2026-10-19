@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from sms_relay.config import settings
+from sms_relay import metrics
 from sms_relay.db import init_db
 from sms_relay.providers import close_provider, get_provider
 from sms_relay.routes import grafana, health, inbound, messages
@@ -29,6 +30,7 @@ _STATIC = os.path.join(os.path.dirname(__file__), "static")
 async def lifespan(_app: FastAPI):
     await init_db()
     get_provider()
+    metrics_server = metrics.start()
 
     stop = asyncio.Event()
     tasks = [
@@ -46,6 +48,8 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        metrics_server.shutdown()
+        metrics_server.server_close()
         stop.set()
         # Give the loops a moment to notice the event and finish the in-flight
         # send before cancelling, so a rolling restart doesn't strand a row in
