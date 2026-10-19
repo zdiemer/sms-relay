@@ -198,3 +198,39 @@ signature and retry behaviour.
 - There's no STOP/HELP keyword handling or consent tracking. Everything here
   goes to numbers that opted in elsewhere; if this ever sends to strangers,
   that needs to exist first.
+
+## ntfy-first notification routing
+
+`secrets.notificationRoutes` is a JSON map of API caller names to fixed `topic`
+and `to` values, optionally constrained by `bodyPattern`. Matching newly queued
+messages use ntfy first; other messages retain SMS behavior. Routes are scoped
+to the normalized recipient, so one owner's subscription cannot capture other
+users' private texts. The Talaria route matches only the two known listing
+notification templates, not verification codes or administrative messages.
+
+The queue records `transport` (`ntfy`, `sms`, or `sms-fallback`) and
+`notification_topic`. `published` means ntfy acknowledged a message, not that a
+phone displayed it. A failed publish commits the fallback decision before SMS
+is attempted; later retries do not go back to ntfy. Existing per-caller
+idempotency works across both channels. Existing failed SMS rows are not replayed.
+
+Delivery remains at-least-once: a lost HTTP response or a crash after upstream
+acceptance but before the database commit can cause a duplicate. ntfy accepting
+a message cannot establish push delivery to a phone. Both channels still depend
+on this relay and the home cluster, and SMS requires the Android gateway.
+
+The additive migration retains existing rows and defaults them to SMS. Published
+ntfy rows use the normal 90-day terminal-message retention policy.
+
+### Grafana webhook
+
+`POST /api/v1/grafana` accepts only the dedicated `grafana` caller credential,
+a bounded Grafana payload, and the configured recipient/topic. Its public
+Ingress exposes only that exact path on `notifications.grafanaHost`, with
+64 KiB buffering and rate limiting. Other API routes and the UI remain private.
+The receiver persists deduplication by alert fingerprint, start time, state,
+and a four-hour reminder bucket. Firing and resolved events are distinct.
+`secrets.ntfyPassword` and the Grafana API key are held in 1Password.
+
+Cloudflare routing is configured separately; see the selfhosted
+`docs/notification-routing.md` handoff.

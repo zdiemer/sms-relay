@@ -5,7 +5,7 @@
 
 image:
   repository: registry.zachd.duckdns.org/zdiemer/sms-relay
-  tag: "gateway-monitoring-20261019"
+  tag: "ntfy-routing-20261019-r2"
   pullPolicy: Always
 
 # Only for an image still on GHCR. The in-cluster registry needs no pull secret:
@@ -111,3 +111,7 @@ resources:
     # bookkeeping service, not a compute one.
     cpu: "1"
     memory: 512Mi
+
+notifications:
+  ntfyUrl: http://ntfy.infra.svc.cluster.local
+  grafanaHost: notify.diemer.codes

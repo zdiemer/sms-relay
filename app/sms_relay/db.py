@@ -64,6 +64,11 @@ async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        columns = {row[1] for row in (await conn.execute(text("PRAGMA table_info(messages)")))}
+        if "transport" not in columns:
+            await conn.execute(text("ALTER TABLE messages ADD COLUMN transport VARCHAR(16) NOT NULL DEFAULT 'sms'"))
+        if "notification_topic" not in columns:
+            await conn.execute(text("ALTER TABLE messages ADD COLUMN notification_topic VARCHAR(64)"))
     logger.info("database ready at %s", settings.db_path)
 
 

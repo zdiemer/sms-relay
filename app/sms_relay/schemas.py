@@ -28,6 +28,8 @@ class MessageOut(BaseModel):
     body: str
     service: str
     attempts: int
+    transport: str = "sms"
+    notification_topic: str | None = None
     provider_message_id: str | None
     error: str | None
     created_at: datetime
@@ -47,6 +49,8 @@ class MessageOut(BaseModel):
             body=message.body,
             service=message.service,
             attempts=message.attempts,
+            transport=message.transport,
+            notification_topic=message.notification_topic,
             provider_message_id=message.provider_message_id,
             error=message.error,
             created_at=message.created_at,

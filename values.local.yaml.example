@@ -44,3 +44,9 @@ secrets:
 # networkPolicy:
 #   enabled: true
 #   nodeCIDR: 10.0.0.0/8
+
+# Additional fields under the existing secrets: mapping (merge, do not replace):
+#   ntfyPassword: <write-only ntfy alerts publisher password>
+#   notificationRoutes: '{"grafana":{"topic":"alerts","to":"<owner E.164>"}}'
+# Add a separate random grafana API key in secrets.apiKeys. Do not reuse an
+# application key for a public contact point.

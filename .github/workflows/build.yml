@@ -1,6 +1,6 @@
 # The image is built and pushed from a laptop via build.sh; CI only proves a
-# PR (usually a Renovate bump) still builds: base tag exists, uv.lock
-# resolves, the app installs.
+# PR still builds and its routing/fallback regression tests pass in the actual
+# runtime: base tag exists, uv.lock resolves, the app installs.
 name: build
 on:
   pull_request:
@@ -11,4 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.4.0
-      - run: docker build .
+      - run: docker build -t sms-relay-ci .
+      - run: >-
+          docker run --rm --user 0 --entrypoint sh sms-relay-ci -c
+          'uv pip install --system pytest pytest-asyncio && python -m pytest /app/app/tests -q'

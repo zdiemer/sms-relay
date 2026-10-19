@@ -44,6 +44,8 @@ spec:
           env:
             - name: HOME
               value: /tmp
+            - name: SMS_RELAY_NTFY_URL
+              value: {{ .Values.notifications.ntfyUrl | quote }}
             - name: SMS_RELAY_DB_PATH
               value: /data/sms-relay.db
             - name: SMS_RELAY_PROVIDER
@@ -63,7 +65,7 @@ spec:
             - name: SMS_RELAY_PUBLIC_URL
               value: https://{{ .Values.ingress.host }}
             {{- end }}
-            {{- range $k := list "SMS_RELAY_GATEWAY_USER" "SMS_RELAY_GATEWAY_PASSWORD" "SMS_RELAY_API_KEYS" "SMS_RELAY_WEBHOOK_SECRET" "SMS_RELAY_SUBSCRIBERS" }}
+            {{- range $k := list "SMS_RELAY_GATEWAY_USER" "SMS_RELAY_GATEWAY_PASSWORD" "SMS_RELAY_API_KEYS" "SMS_RELAY_WEBHOOK_SECRET" "SMS_RELAY_SUBSCRIBERS" "SMS_RELAY_NTFY_PASSWORD" "SMS_RELAY_NOTIFICATION_ROUTES" }}
             - name: {{ $k }}
               valueFrom:
                 secretKeyRef:

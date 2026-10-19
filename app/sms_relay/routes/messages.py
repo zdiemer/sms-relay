@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sms_relay.auth import require_api_key
 from sms_relay.db import get_session
 from sms_relay.models import Direction, Message, MessageStatus, utcnow
+from sms_relay.notifications import topic_for
 from sms_relay.phone import InvalidPhoneNumber, normalize, redact
 from sms_relay.schemas import MessageList, MessageOut, SendRequest, SendResponse
 
@@ -88,6 +89,9 @@ async def send_message(
         )
         for to_number in normalized
     ]
+    for message in created:
+        message.notification_topic = topic_for(service, message.to_number, message.body)
+        message.transport = "ntfy" if message.notification_topic else "sms"
     session.add_all(created)
 
     try:

@@ -28,6 +28,7 @@ from sms_relay.models import (
     utcnow,
 )
 from sms_relay.providers import ProviderError, get_provider
+from sms_relay.notifications import publish
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,24 @@ async def send_loop(stop: asyncio.Event) -> None:
                 if message is None:
                     await _sleep_or_stop(stop, SEND_POLL_SECONDS)
                     continue
+
+                if message.transport == "ntfy":
+                    try:
+                        receipt = await publish(message)
+                    except (httpx.HTTPError, ValueError, TimeoutError):
+                        # Commit the fallback decision before sending SMS, so a
+                        # retry/restart never goes back and also publishes ntfy.
+                        message.transport = "sms-fallback"
+                        message.error = "ntfy publish failed; SMS fallback selected"
+                        await session.commit()
+                        logger.warning("notification %s switching to SMS fallback", message.id)
+                    else:
+                        message.status = MessageStatus.PUBLISHED
+                        message.provider_message_id = "ntfy:" + receipt
+                        message.sent_at = utcnow()
+                        message.error = None
+                        await session.commit()
+                        continue
 
                 await limiter.acquire()
                 try:

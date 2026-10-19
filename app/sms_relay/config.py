@@ -88,6 +88,15 @@ class Settings:
         default_factory=lambda: _env_int("SMS_RELAY_RETENTION_DAYS", 90)
     )
 
+    ntfy_url: str = field(default_factory=lambda: _env("SMS_RELAY_NTFY_URL"))
+    ntfy_user: str = field(default_factory=lambda: _env("SMS_RELAY_NTFY_USER", "alerts"))
+    ntfy_password: str = field(default_factory=lambda: _env("SMS_RELAY_NTFY_PASSWORD"))
+
+    @property
+    def notification_routes(self) -> dict:
+        value = _env_json("SMS_RELAY_NOTIFICATION_ROUTES", {})
+        return value if isinstance(value, dict) else {}
+
     @property
     def api_keys(self) -> dict[str, str]:
         """Map of API key -> owning service name.

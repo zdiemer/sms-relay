@@ -42,12 +42,13 @@ class MessageStatus(enum.StrEnum):
     SENT = "sent"  # handed to the provider
     DELIVERED = "delivered"  # provider confirmed handset delivery
     FAILED = "failed"  # retries exhausted, or a permanent error
+    PUBLISHED = "published"  # accepted by ntfy, not handset-delivery confirmation
     RECEIVED = "received"  # inbound only
 
 
 # Statuses a message can never leave. Used to keep the worker's claim query
 # cheap and to make retention pruning safe.
-TERMINAL_STATUSES = (MessageStatus.DELIVERED, MessageStatus.FAILED, MessageStatus.RECEIVED)
+TERMINAL_STATUSES = (MessageStatus.DELIVERED, MessageStatus.FAILED, MessageStatus.RECEIVED, MessageStatus.PUBLISHED)
 
 
 class Message(Base):
@@ -68,6 +69,9 @@ class Message(Base):
     # Callers may supply an idempotency key; a repeat POST with the same
     # (service, key) returns the original message instead of sending twice.
     idempotency_key: Mapped[str | None] = mapped_column(String(128))
+
+    transport: Mapped[str] = mapped_column(String(16), default="sms", server_default="sms")
+    notification_topic: Mapped[str | None] = mapped_column(String(64))
 
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

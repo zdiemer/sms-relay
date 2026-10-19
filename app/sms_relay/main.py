@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 from sms_relay.config import settings
 from sms_relay.db import init_db
 from sms_relay.providers import close_provider, get_provider
-from sms_relay.routes import health, inbound, messages
+from sms_relay.routes import grafana, health, inbound, messages
 from sms_relay.worker import fanout_loop, prune_loop, send_loop, status_loop
 
 logging.basicConfig(
@@ -79,3 +79,5 @@ async def index() -> HTMLResponse:
     """
     with open(os.path.join(_STATIC, "index.html")) as fh:
         return HTMLResponse(fh.read())
+
+app.include_router(grafana.router)

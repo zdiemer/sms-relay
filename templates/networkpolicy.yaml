@@ -38,6 +38,16 @@ spec:
           protocol: TCP
   egress:
     - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ntfy
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
         - namespaceSelector: {}
           podSelector:
             matchLabels:
