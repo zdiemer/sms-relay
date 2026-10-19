@@ -8,10 +8,13 @@ WORKDIR /app
 # instead of whatever PyPI serves that day.
 COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /usr/local/bin/uv
 COPY app/ /app/app/
-RUN uv export --directory /app/app --frozen --no-dev --no-emit-project -o /tmp/requirements.txt \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && uv export --directory /app/app --frozen --no-dev --no-emit-project -o /tmp/requirements.txt \
  && uv pip install --system --no-cache -r /tmp/requirements.txt \
  && uv pip install --system --no-cache --no-deps /app/app \
- && rm /tmp/requirements.txt
+ && apt-get purge -y --auto-remove gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/* /tmp/requirements.txt
 
 ENV SMS_RELAY_DB_PATH=/data/sms-relay.db \
     HOME=/tmp \

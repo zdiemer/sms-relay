@@ -5,7 +5,7 @@
 
 image:
   repository: registry.zachd.duckdns.org/zdiemer/sms-relay
-  tag: "v1"
+  tag: "renovate-20261019"
   pullPolicy: Always
 
 # Only for an image still on GHCR. The in-cluster registry needs no pull secret:
