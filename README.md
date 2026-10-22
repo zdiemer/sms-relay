@@ -205,8 +205,8 @@ signature and retry behaviour.
 and `to` values, optionally constrained by `bodyPattern`. Matching newly queued
 messages use ntfy first; other messages retain SMS behavior. Routes are scoped
 to the normalized recipient, so one owner's subscription cannot capture other
-users' private texts. The Talaria route matches only the two known listing
-notification templates, not verification codes or administrative messages.
+users' private texts. Talaria has no ntfy route: listing notifications,
+verification codes, and administrative messages retain SMS delivery.
 
 The queue records `transport` (`ntfy`, `sms`, or `sms-fallback`) and
 `notification_topic`. `published` means ntfy acknowledged a message, not that a
