@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install from uv.lock so every image build resolves the same dependency set
 # instead of whatever PyPI serves that day.
-COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /usr/local/bin/uv
 COPY app/ /app/app/
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc libc6-dev \
