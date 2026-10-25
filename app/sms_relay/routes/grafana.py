@@ -2,6 +2,7 @@
 import hashlib
 import json
 import time
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -34,31 +35,53 @@ async def grafana(request: Request, service: Annotated[str, Depends(require_api_
         alerts = data["alerts"]
         if not isinstance(alerts, list) or not 1 <= len(alerts) <= 100:
             raise ValueError()
-        messages = []
-        # Validate the whole group before accepting any alert.
+        entries = []
+        # Validate the entire webhook before queueing its single notification.
         for alert in alerts:
             if not isinstance(alert, dict) or not isinstance(alert.get("labels"), dict) or not isinstance(alert.get("annotations", {}), dict):
                 raise ValueError()
             state = alert["status"]
             if state not in ("firing", "resolved"):
                 raise ValueError()
-            name = alert["labels"]["alertname"]
+            labels = alert["labels"]
+            name = labels["alertname"]
             summary = alert.get("annotations", {}).get("summary", name)
-            fingerprint = alert["fingerprint"]
-            starts = alert["startsAt"]
+            fingerprint, starts = alert["fingerprint"], alert["startsAt"]
             if not all(isinstance(x, str) and x for x in [name, summary, fingerprint, starts]):
                 raise ValueError()
-            # Persistent per-instance dedup, including recovery and 4h reminders.
-            key = hashlib.sha256(json.dumps([fingerprint, starts, state, int(time.time() // 14400) if state == "firing" else 0]).encode()).hexdigest()
-            affected = ", ".join(f"{label}={alert['labels'][label]}" for label in
-                ["instance", "node", "namespace", "pod", "persistentvolumeclaim", "job_name", "cronjob", "service"]
-                if label in alert["labels"])
-            text = f"[{state.upper()}] {name}: {summary}"
+            started = datetime.fromisoformat(starts.replace("Z", "+00:00"))
+            if started.tzinfo is None:
+                raise ValueError()
+            # Anchor reminders to this incident, not UTC wall-clock buckets.
+            reminder = max(0, int((time.time() - started.timestamp()) // 14400)) if state == "firing" else 0
+            affected = ", ".join(f"{label}={labels[label]}" for label in
+                ["app", "checks", "node", "namespace", "persistentvolumeclaim", "job_name", "cronjob", "service"]
+                if labels.get(label))
+            if not affected:
+                affected = ", ".join(f"{label}={labels[label]}" for label in ["instance", "pod"] if labels.get(label))
+            # Recovery summaries must not repeat the stale firing instructions.
+            description = summary if state == "firing" else "Alert condition cleared."
+            text = f"[{state.upper()}] {name}: {description}"
             if affected:
                 text += "\n" + affected
-            messages.append(SendRequest(to=route["to"], body=text[:4000], idempotency_key="grafana-"+key))
+            critical = labels.get("severity") == "critical"
+            priority = (4 if state == "firing" else 3) if critical else (3 if state == "firing" else 1)
+            entries.append(([fingerprint, starts, state, reminder], text[:1800], priority))
+        entries.sort(key=lambda x: (-x[2], x[0]))
+        # Order-independent, persistent dedup of the whole group. A newly firing
+        # or resolved member changes the key; identical webhook retries do not.
+        key = hashlib.sha256(json.dumps([x[0] for x in entries]).encode()).hexdigest()
+        lines = []
+        for _, text, _ in entries:
+            if sum(len(s) + 2 for s in lines) + len(text) > 3800:
+                break
+            lines.append(text)
+        text = "\n\n".join(lines)
+        if len(lines) < len(entries):
+            text += f"\n\n{len(entries)-len(lines)} additional alerts; see Grafana."
+        message = SendRequest(to=route["to"], body=text, notification_priority=max(x[2] for x in entries),
+                              idempotency_key="grafana-group-"+key)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(400, "invalid Grafana webhook") from None
-    for message in messages:
-        await send_message(message, service, session)
-    return {"accepted": len(messages)}
+    await send_message(message, service, session)
+    return {"accepted": len(entries), "notifications": 1}

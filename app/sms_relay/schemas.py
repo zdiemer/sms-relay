@@ -10,6 +10,7 @@ from sms_relay.models import Message
 
 
 class SendRequest(BaseModel):
+    notification_priority: int = Field(default=3, ge=1, le=5)
     to: str | list[str] = Field(description="Recipient(s); any format libphonenumber accepts")
     body: str = Field(min_length=1, max_length=4000)
     idempotency_key: str | None = Field(
@@ -30,6 +31,7 @@ class MessageOut(BaseModel):
     attempts: int
     transport: str = "sms"
     notification_topic: str | None = None
+    notification_priority: int = 3
     provider_message_id: str | None
     error: str | None
     created_at: datetime
@@ -51,6 +53,7 @@ class MessageOut(BaseModel):
             attempts=message.attempts,
             transport=message.transport,
             notification_topic=message.notification_topic,
+            notification_priority=message.notification_priority,
             provider_message_id=message.provider_message_id,
             error=message.error,
             created_at=message.created_at,

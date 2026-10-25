@@ -72,6 +72,7 @@ class Message(Base):
 
     transport: Mapped[str] = mapped_column(String(16), default="sms", server_default="sms")
     notification_topic: Mapped[str | None] = mapped_column(String(64))
+    notification_priority: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
 
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

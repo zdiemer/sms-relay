@@ -31,7 +31,8 @@ async def publish(message):
                 settings.ntfy_url.rstrip("/") + "/",
                 auth=(settings.ntfy_user, settings.ntfy_password),
                 json={"topic": message.notification_topic, "message": message.body,
-                      "title": message.service, "tags": ["bell"]},
+                      "title": message.service, "tags": ["bell"],
+                      "priority": getattr(message, "notification_priority", 3)},
             )
             response.raise_for_status()
             receipt = response.json()

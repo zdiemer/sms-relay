@@ -69,6 +69,8 @@ async def init_db() -> None:
             await conn.execute(text("ALTER TABLE messages ADD COLUMN transport VARCHAR(16) NOT NULL DEFAULT 'sms'"))
         if "notification_topic" not in columns:
             await conn.execute(text("ALTER TABLE messages ADD COLUMN notification_topic VARCHAR(64)"))
+        if "notification_priority" not in columns:
+            await conn.execute(text("ALTER TABLE messages ADD COLUMN notification_priority INTEGER NOT NULL DEFAULT 3"))
     logger.info("database ready at %s", settings.db_path)
 
 

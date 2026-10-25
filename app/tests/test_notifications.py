@@ -109,6 +109,50 @@ async def test_existing_database_migration_preserves_rows(tmp_path):
         await db.init_db()
         await db.init_db()
     async with engine.connect() as conn:
-        row = (await conn.execute(text('SELECT body,transport,notification_topic FROM messages'))).one()
-        assert tuple(row) == ('preserved', 'sms', None)
+        row = (await conn.execute(text('SELECT body,transport,notification_topic,notification_priority FROM messages'))).one()
+        assert tuple(row) == ('preserved', 'sms', None, 3)
     await engine.dispose()
+
+
+def test_grouped_webhook_order_dedup_and_priorities(client):
+    settings = config()
+    settings.api_keys = {'group-test': 'grafana'}
+    headers = {'Authorization': 'Bearer group-test'}
+    def item(app, status='firing', severity='warning'):
+        return {'status': status, 'fingerprint': 'group-'+app, 'startsAt': '2026-10-25T01:00:00Z',
+                'labels': {'alertname': 'Arr application health warning', 'app': app,
+                           'checks': 'IndexerStatusCheck', 'severity': severity},
+                'annotations': {'summary': 'Persistent warning'}}
+    with patch('sms_relay.auth.settings', settings), patch('sms_relay.routes.grafana.settings', settings):
+        before = client.get('/api/v1/messages', headers=headers).json()['total']
+        payload = {'alerts': [item('sonarr'), item('radarr')]}
+        first = client.post('/api/v1/grafana', json=payload, headers=headers)
+        assert first.json() == {'accepted': 2, 'notifications': 1}
+        payload['alerts'].reverse()
+        assert client.post('/api/v1/grafana', json=payload, headers=headers).status_code == 202
+        result = client.get('/api/v1/messages', headers=headers).json()
+        assert result['total'] == before + 1
+        msg = result['messages'][0]
+        assert 'app=sonarr' in msg['body'] and 'app=radarr' in msg['body']
+        assert 'IndexerStatusCheck' in msg['body'] and msg['notification_priority'] == 3
+        payload = {'alerts': [item('sonarr', 'resolved'), item('radarr', 'resolved')]}
+        client.post('/api/v1/grafana', json=payload, headers=headers)
+        msg = client.get('/api/v1/messages', headers=headers).json()['messages'][0]
+        assert msg['notification_priority'] == 1
+        assert 'Persistent warning' not in msg['body']
+        payload = {'alerts': [item('sonarr'), item('critical', severity='critical')]}
+        client.post('/api/v1/grafana', json=payload, headers=headers)
+        assert client.get('/api/v1/messages', headers=headers).json()['messages'][0]['notification_priority'] == 4
+        payload = {'alerts': [item('critical', 'resolved', 'critical')]}
+        client.post('/api/v1/grafana', json=payload, headers=headers)
+        assert client.get('/api/v1/messages', headers=headers).json()['messages'][0]['notification_priority'] == 3
+
+
+@pytest.mark.asyncio
+async def test_ntfy_priority_survives_publication():
+    http = AsyncMock()
+    http.post.return_value = httpx.Response(200, json={'event':'message','id':'receipt'}, request=httpx.Request('POST','http://ntfy'))
+    with patch('sms_relay.notifications.settings', config()), patch('httpx.AsyncClient') as factory:
+        factory.return_value.__aenter__.return_value = http
+        await publish(SimpleNamespace(notification_topic='alerts', body='recovered', service='grafana', notification_priority=1))
+    assert http.post.call_args.kwargs['json']['priority'] == 1

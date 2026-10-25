@@ -234,3 +234,16 @@ and a four-hour reminder bucket. Firing and resolved events are distinct.
 
 Cloudflare routing is configured separately; see the selfhosted
 `docs/notification-routing.md` handoff.
+
+### Grouped alert notifications
+
+Grafana webhooks queue one message per group, with a stable key independent of
+alert order. Changed incident membership or state generates a new notification;
+identical retries do not. Reminders use four-hour windows anchored to each
+incident. Arr app/check identifiers are included when present. Oversized groups
+show an explicit omitted-alert count and direct the reader to Grafana.
+
+`notification_priority` (1–5, default 3) is persisted on messages and forwarded to
+ntfy. Warning recoveries use 1, firing warnings 3, critical firing 4, and critical
+recovery 3. Mixed groups use the maximum. Existing SQLite databases receive an
+additive column with default 3; SMS delivery and fallback selection are unchanged.

@@ -83,6 +83,7 @@ async def send_message(
             status=MessageStatus.QUEUED,
             to_number=to_number,
             body=request.body,
+            notification_priority=request.notification_priority,
             service=service,
             idempotency_key=request.idempotency_key,
             next_attempt_at=utcnow(),
