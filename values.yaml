@@ -5,7 +5,7 @@
 
 image:
   repository: registry.zachd.duckdns.org/zdiemer/sms-relay
-  tag: "grouped-alerts-20261025"
+  tag: "uv0138-20261118"
   pullPolicy: Always
 
 # Only for an image still on GHCR. The in-cluster registry needs no pull secret:
